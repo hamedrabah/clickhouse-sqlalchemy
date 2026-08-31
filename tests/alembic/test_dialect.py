@@ -22,7 +22,7 @@ class PatchAlembicVersionTestCase(TestCase):
         )
         return context, version
 
-    def test_replacing_merge_tree_uses_non_empty_sorting_key(self):
+    def test_replacing_merge_tree_allows_intentional_empty_sorting_key(self):
         cases = (
             ({}, engines.ReplacingMergeTree),
             (
@@ -43,5 +43,5 @@ class PatchAlembicVersionTestCase(TestCase):
 
                 ddl = str(CreateTable(version).compile(dialect=ClickHouseDialect()))
                 self.assertIsInstance(version.engine, engine_type)
-                self.assertIn("ORDER BY dt", ddl)
-                self.assertNotIn("ORDER BY tuple()", ddl)
+                self.assertIn("ORDER BY tuple()", ddl)
+                self.assertIn("SETTINGS allow_suspicious_primary_key=1", ddl)

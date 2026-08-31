@@ -49,19 +49,26 @@ def patch_alembic_version(context, **kwargs):
     version_num = Column("version_num", types.String, primary_key=True)
     version.append_column(dt)
     version.append_column(version_num, replace_existing=True)
-    order_by = version.c.dt
+
+    # Keep all version rows in the same replacement group. ClickHouse 25.12+
+    # requires an explicit opt-in for special MergeTree engines with an empty
+    # sorting key.
+    engine_kwargs = {
+        "version": dt,
+        "order_by": func.tuple(),
+        "allow_suspicious_primary_key": 1,
+    }
 
     if "cluster" in kwargs:
         cluster = kwargs["cluster"]
         version.engine = engines.ReplicatedReplacingMergeTree(
             kwargs["table_path"],
             kwargs["replica_name"],
-            version=dt,
-            order_by=order_by,
+            **engine_kwargs,
         )
         version.kwargs["clickhouse_cluster"] = cluster
     else:
-        version.engine = engines.ReplacingMergeTree(version=dt, order_by=order_by)
+        version.engine = engines.ReplacingMergeTree(**engine_kwargs)
 
 
 def include_object(object, name, type_, reflected, compare_to):
