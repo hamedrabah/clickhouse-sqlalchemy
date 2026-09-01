@@ -1,4 +1,4 @@
-from sqlalchemy import Column, func
+from sqlalchemy import Column, func, text
 from sqlalchemy import types as sqltypes
 
 try:
@@ -47,17 +47,16 @@ def patch_alembic_version(context, **kwargs):
 
     dt = Column("dt", types.DateTime, server_default=func.now())
     version_num = Column("version_num", types.String, primary_key=True)
+    version_key = Column("version_key", types.UInt8, server_default=text("0"))
     version.append_column(dt)
     version.append_column(version_num, replace_existing=True)
+    version.append_column(version_key)
 
-    # Keep all version rows in the same replacement group. ClickHouse 25.12+
-    # requires an explicit opt-in for special MergeTree engines with an empty
-    # sorting key.
-    engine_kwargs = {
-        "version": dt,
-        "order_by": func.tuple(),
-        "allow_suspicious_primary_key": 1,
-    }
+    # Keep all version rows in the same replacement group. A timestamp is not
+    # suitable as the sorting key because it gives each inserted row a distinct
+    # identity. The constant key also avoids changing version_num's sorting key
+    # when Alembic updates it.
+    engine_kwargs = {"version": dt, "order_by": version_key}
 
     if "cluster" in kwargs:
         cluster = kwargs["cluster"]
